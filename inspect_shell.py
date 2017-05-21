@@ -22,7 +22,7 @@
 
 
 import sys
-import StringIO
+import io
 import contextlib
 import struct
 import traceback
@@ -69,7 +69,7 @@ class Disconnected(Exception): pass
 # no matter what happens 
 @contextlib.contextmanager
 def stdoutIO():
-    stdout = StringIO.StringIO()
+    stdout = io.StringIO()
     old_out = sys.stdout
     sys.stdout = stdout
     yield stdout
@@ -88,7 +88,7 @@ def run_shell_server(f_globals, interface, port):
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     
     try: sock.bind((interface, port))
-    except Exception, e:
+    except Exception as e:
         if isinstance(e, socket.error) and getattr(e, "errno", False) == 98:
             raise PortInUseException("%d in use" % port)
         else: raise
@@ -140,8 +140,8 @@ def run_shell_server(f_globals, interface, port):
             if action == COMMAND:
                 with stdoutIO() as stdout:
                     # lets us exec AND eval
-                    try: exec compile(data, "<dummy>", "single") in f_globals, f_globals
-                    except: print traceback.format_exc()
+                    try: exec(compile(data, "<dummy>", "single"), f_globals, f_globals)
+                    except: print(traceback.format_exc())
     
                 out = stdout.getvalue()
                 try: do_reply(out)
@@ -180,12 +180,12 @@ class Shell(object):
         
     def send(self, command, data):
         sent = False
-        for i in xrange(reconnect_tries):
+        for i in range(reconnect_tries):
             try: reply = self._do_request(command, data)
             except Disconnected: self.reconnect()
             else: return reply
             
-        raise Disconnected, "and tried %d times to reconnect" % reconnect_tries
+        raise Disconnected("and tried %d times to reconnect" % reconnect_tries)
         
         
     def _do_request(self, action, data):
@@ -221,7 +221,7 @@ class Shell(object):
         
         
     def run(self):
-        print Shell.banner_template.format(version=version)
+        print(Shell.banner_template.format(version=version))
         prompt = Shell.prompt_template.format(
             interface=self.interface,
             port=self.port
@@ -229,17 +229,17 @@ class Shell(object):
         
         try: self.reconnect()
         except socket.error:
-            print "** ERROR connecting to %s:%d, are you sure you added \
-\"import inspect_shell\" to the top of your script? **\n" % (self.interface, self.port)
+            print("** ERROR connecting to %s:%d, are you sure you added \
+\"import inspect_shell\" to the top of your script? **\n" % (self.interface, self.port))
            
         while True:
-            try: line = raw_input(prompt)
+            try: line = input(prompt)
             except (EOFError, KeyboardInterrupt):
                 print('')
                 return
             
             reply = self.send(COMMAND, line)         
-            print reply
+            print(reply)
             
 
 
